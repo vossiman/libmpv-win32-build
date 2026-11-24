@@ -1,0 +1,131 @@
+# The LGPL Win64 libmpv that lean-iptv ships (docs/licences.md section 4.4):
+# one x86_64 build, and with each release its sources.txt and a source
+# archive of every component as built. The upstream workflows stay untouched.
+name: lgpl release
+defaults:
+  run:
+    shell: bash
+
+on:
+  workflow_dispatch:
+    inputs:
+      github_release:
+        description: 'Publish an lgpl-* release'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Building LGPL libmpv x86_64
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    container:
+      image: docker://ghcr.io/shinchiro/archlinux:latest
+    steps:
+      - name: Setup git config
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+
+      - name: Installing Meson
+        run: |
+          python -m pip --version || pacman -Sy --needed --noconfirm python-pip
+          python -m pip install --upgrade --break-system-packages 'meson>=1.3.0'
+
+      - name: Loading toolchain cache
+        id: toolchain_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            clang_root
+            build_x86_64
+          key: lgpl-toolchain-x86_64-${{ hashFiles('toolchain/**') }}
+
+      - name: Configuring CMake
+        run: |
+          cmake -DTARGET_ARCH=x86_64-w64-mingw32 -DCOMPILER_TOOLCHAIN=clang \
+            -DCMAKE_INSTALL_PREFIX=$PWD/clang_root \
+            -DMINGW_INSTALL_PREFIX=$PWD/build_x86_64/x86_64-w64-mingw32 \
+            -DSINGLE_SOURCE_LOCATION=$PWD/src_packages \
+            -DRUSTUP_LOCATION=$PWD/clang_root/install_rustup \
+            -DCLANG_PACKAGES_LTO=ON -G Ninja -B build_x86_64 -S $PWD
+
+      - name: Building the toolchain
+        if: ${{ steps.toolchain_cache.outputs.cache-hit != 'true' }}
+        run: |
+          ninja -C build_x86_64 llvm
+          ninja -C build_x86_64 llvm-clang
+          rm -rf build_x86_64/{toolchain,packages}
+
+      - name: Saving toolchain cache
+        if: ${{ steps.toolchain_cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            clang_root
+            build_x86_64
+          key: lgpl-toolchain-x86_64-${{ hashFiles('toolchain/**') }}
+
+      - name: Downloading sources
+        run: |
+          cmake -B build_x86_64 -S $PWD
+          ninja -C build_x86_64 download
+
+      - name: Building mpv
+        run: |
+          ninja -C build_x86_64 mpv
+          ninja -C build_x86_64 mpv-packaging
+          mkdir -p release
+          mv build_x86_64/mpv-dev-x86_64-*.7z release/
+
+      - name: Recording sources
+        run: scripts/lgpl-sources.sh src_packages release
+
+      - name: Uploading the release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: lgpl-x86_64
+          path: release/
+
+      - name: Collecting logs
+        if: always()
+        run: |
+          mkdir -p logs
+          cp -f $(find build_x86_64 -type f -iname "*-*.log" -or -wholename "*/ffbuild/config.log") logs/ || true
+
+      - name: Uploading logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs
+          path: logs/
+          retention-days: 7
+
+  release:
+    name: Publishing the release
+    needs: build
+    if: ${{ inputs.github_release }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: lgpl-x86_64
+          path: release
+      - name: Creating lgpl-* release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="lgpl-$(date -u +%Y%m%d)-${{ github.run_number }}"
+          dev=$(ls release/mpv-dev-x86_64-*.7z)
+          mv "$dev" release/libmpv_lgpl_x86_64.7z
+          mv release/source.tar.xz release/libmpv_lgpl_x86_64_source.tar.xz
+          (cd release && sha256sum * > SHA256SUMS)
+          gh release create "$tag" release/* -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "$tag" --notes "LGPL Win64 libmpv for lean-iptv. Built from ${GITHUB_SHA}; sources.txt lists the exact revision of every component, libmpv_lgpl_x86_64_source.tar.xz holds them as built (LGPL source offer)."

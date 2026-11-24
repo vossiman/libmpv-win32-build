@@ -14,6 +14,8 @@ repo=$(cd "$(dirname "$0")/.." && pwd)
   echo "build-repo $(git -C "$repo" remote get-url origin) $(git -C "$repo" rev-parse HEAD)"
   for d in "$src"/*/; do
     name=$(basename "$d")
+    # An empty folder is a component this build never fetched, so not in the DLL.
+    [ -n "$(ls -A "$d")" ] || continue
     if [ -e "$d/.git" ]; then
       echo "$name $(git -C "$d" remote get-url origin) $(git -C "$d" rev-parse HEAD)"
     else
@@ -32,6 +34,7 @@ mkdir -p "$stage/components" "$stage/build-repo"
 git -C "$repo" archive HEAD | tar -C "$stage/build-repo" -xf -
 for d in "$src"/*/; do
   name=$(basename "$d")
+  [ -n "$(ls -A "$d")" ] || continue
   case "$name" in
     gcc|rustup) continue ;;
     llvm)

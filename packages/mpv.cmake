@@ -27,6 +27,8 @@ ExternalProject_Add(mpv
         --default-library=shared
         --prefer-static
         -Dgpl=false
+        # LGPL build: mpv links Rubber Band (GPL) whenever it finds it, gpl=false or not.
+        -Drubberband=disabled
         -Ddebug=false
         -Db_ndebug=false
         -Doptimization=3

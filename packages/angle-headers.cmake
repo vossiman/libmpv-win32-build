@@ -3,6 +3,9 @@ ExternalProject_Add(angle-headers
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_REMOTE_NAME origin
     GIT_TAG main
+    # Pinned while mpv stays at 0b7ed67 (packages/mpv.cmake): its context_angle.c
+    # needs EGL_PLATFORM_ANGLE_TYPE_D3D9_ANGLE, which later ANGLE headers dropped.
+    GIT_RESET 0cb8023c01f92b29f3738ea7472d06f8f059ed84
     GIT_CLONE_FLAGS "--sparse --filter=tree:0"
     GIT_CLONE_POST_COMMAND "sparse-checkout set --no-cone include/EGL include/KHR"
     GIT_SUBMODULES ""

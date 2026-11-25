@@ -27,6 +27,11 @@ repo=$(cd "$(dirname "$0")/.." && pwd)
     fi
   done
 } > "$out/sources.txt"
+# The DLL links libc++ and the mingw-w64 runtime statically: no release
+# without their source.
+for need in llvm mingw-w64; do
+  grep -q "^$need " "$out/sources.txt" || { echo "lgpl-sources: $need source missing" >&2; exit 1; }
+done
 
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT

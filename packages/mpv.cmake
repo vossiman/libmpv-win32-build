@@ -16,7 +16,10 @@ ExternalProject_Add(mpv
         libplacebo
         spirv-cross
     GIT_REPOSITORY https://github.com/mpv-player/mpv.git
-    GIT_TAG 1eb941fdb974fe25dc0ac68a33652c145ff41f9d
+    # mpv and its dxgi render patch as of upstream release 202609151348, the
+    # libmpv that lean-iptv's pinned media_kit fork (803c4a2791) renders with:
+    # its video_output.cc asks for MPV_RENDER_API_TYPE_DXGI. Move with that pin.
+    GIT_TAG 0b7ed670f7c353dd3dd4f8ae0fc788a181a15aa6
     SOURCE_DIR ${SOURCE_LOCATION}
     PATCH_COMMAND ${EXEC} git apply ${CMAKE_CURRENT_SOURCE_DIR}/mpv-*.patch
     UPDATE_COMMAND ""
@@ -70,7 +73,7 @@ ExternalProject_Add_Step(mpv copy-binary
     COMMAND ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/include/mpv/stream_cb.h    ${CMAKE_CURRENT_BINARY_DIR}/mpv-dev/include/mpv/stream_cb.h
     COMMAND ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/include/mpv/render.h       ${CMAKE_CURRENT_BINARY_DIR}/mpv-dev/include/mpv/render.h
     COMMAND ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/include/mpv/render_gl.h    ${CMAKE_CURRENT_BINARY_DIR}/mpv-dev/include/mpv/render_gl.h
-    COMMAND ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/include/mpv/render_d3d11.h ${CMAKE_CURRENT_BINARY_DIR}/mpv-dev/include/mpv/render_d3d11.h
+    COMMAND ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/include/mpv/render_dxgi.h  ${CMAKE_CURRENT_BINARY_DIR}/mpv-dev/include/mpv/render_dxgi.h
     COMMENT "Copying mpv binaries and manual"
 )
 
